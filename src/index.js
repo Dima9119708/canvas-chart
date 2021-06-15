@@ -1,8 +1,10 @@
 import '@babel/polyfill'
+import './styles.scss'
 import data from './js/data/data'
 import {searchMinMax} from "./js/utils";
-import {drawLine, xAxis, yAxis} from "./js/draw";
+import {drawArc, drawVerticalLine, line, toCoords, xAxis, yAxis} from "./js/draw";
 import {DPI_HEIGHT, DPI_WIDTH, HEIGHT, PADDING, VIEW_HEIGHT, VIEW_WIDTH, WIDTH} from "./js/vars";
+import {tooltip} from "./js/tooltiip";
 
 function chart(canvas, data) {
     const ctx = canvas.getContext('2d')
@@ -18,22 +20,73 @@ function chart(canvas, data) {
     const [yMin, yMax] = searchMinMax(yData.flat())
     const yRatio = VIEW_HEIGHT / (yMax - yMin)
     const xRatio = VIEW_WIDTH / (data.columns[0].length - 1)
+    let rfa = null
 
-    yAxis(ctx, yMin, yMax)
-    xAxis(ctx, xData)
+    const mouse = {
+        x: undefined,
+        currentX: undefined,
+        clientX: undefined,
+        pointsArc: [],
 
-    yData.map(toCoords(xRatio, yRatio)).forEach( (coords, i) => {
-        drawLine(ctx, coords, data.colors[yData[i][0]])
-    })
+        clear() {
+            this.x = undefined
+            this.currentX = undefined
+            this.clientX = undefined
+            this.pointsArc = []
+        }
+    }
+
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        mouse.pointsArc.length = 0
+    }
+
+    function render() {
+        clearCanvas()
+
+        yAxis(ctx, yMin, yMax)
+        xAxis(ctx, xData, xRatio, mouse)
+
+        yData.map(toCoords(xRatio, yRatio)).forEach( (coords, i) => {
+            line(ctx, coords, data.colors[yData[i][0]], mouse)
+        })
+
+        drawVerticalLine(ctx, mouse)
+        drawArc(ctx, mouse.pointsArc, yData)
+
+        tooltip.left( mouse.clientX + 20).update(mouse, yData)
+    }
+
+    render()
+
+    const { left } = canvas.getBoundingClientRect()
+
+    canvas.addEventListener('mouseenter', mouseEnter)
+
+    function mouseEnter(e) {
+        tooltip.open().left(e.clientX + 20)
+        canvas.addEventListener('mousemove',  mouseMove)
+        canvas.addEventListener('mouseleave', mouseLeave)
+    }
+
+    function mouseMove({ clientX }) {
+        rfa = requestAnimationFrame(render)
+
+        const currentX = Math.floor(clientX - left) * (DPI_WIDTH / WIDTH)
+
+        mouse.currentX = currentX
+        mouse.clientX = clientX
+    }
+
+    function mouseLeave() {
+        mouse.clear()
+        tooltip.close()
+        render()
+        canvas.removeEventListener('mousemove', mouseMove)
+        canvas.removeEventListener('mouseleave', mouseLeave)
+        cancelAnimationFrame(rfa)
+    }
 }
 
-function toCoords(xRatio, yRatio) {
-    return (col) => col.map((y, i) => [
-        Math.floor(i * xRatio),
-        typeof y === 'number'
-            ? Math.floor(DPI_HEIGHT - PADDING - y * yRatio)
-            : DPI_HEIGHT - PADDING
-    ])
-}
 
 chart(document.getElementById('chart'), data)
