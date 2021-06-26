@@ -1,60 +1,76 @@
 import '@babel/polyfill'
 import './styles.scss'
 import data from './js/data/data'
-import {searchMinMax} from "./js/utils";
-import {drawArc, drawVerticalLine, line, toCoords, xAxis, yAxis} from "./js/draw";
+import {computeXRatio, computeYRatio, getOnlyNumbers, searchMinMax, toCoords} from "./js/utils";
+import {drawArc, drawVerticalLine, line, xAxis, yAxis} from "./js/draw";
 import {DPI_HEIGHT, DPI_WIDTH, HEIGHT, PADDING, VIEW_HEIGHT, VIEW_WIDTH, WIDTH} from "./js/vars";
 import {tooltip} from "./js/tooltiip";
+import mouse from "./js/mouse";
+import {sliderChart} from "./js/slider";
 
-function chart(canvas, data) {
+function chart(root, data) {
+    const canvas = root.querySelector('[data-el="main"]')
+    const slider = sliderChart(root.querySelector('[data-el="slider"]'), data)
     const ctx = canvas.getContext('2d')
+
+    let rfa
 
     canvas.style.width = WIDTH + 'px'
     canvas.style.height = HEIGHT + 'px'
     canvas.width = DPI_WIDTH
     canvas.height = DPI_HEIGHT
 
-    const yData = data.columns.filter(col => data.types[col[0]] === 'line')
-    const xData = data.columns.filter(col => data.types[col[0]] !== 'line')[0]
+    let count = 100
 
-    const [yMin, yMax] = searchMinMax(yData.flat())
-    const yRatio = VIEW_HEIGHT / (yMax - yMin)
-    const xRatio = VIEW_WIDTH / (data.columns[0].length - 1)
-    let rfa = null
-
-    const mouse = {
-        x: undefined,
-        currentX: undefined,
-        clientX: undefined,
-        pointsArc: [],
-
-        clear() {
-            this.x = undefined
-            this.currentX = undefined
-            this.clientX = undefined
-            this.pointsArc = []
-        }
-    }
+    slider.subscribe(pos => {
+        mouse.pos = pos
+        render()
+    })
 
     function clearCanvas() {
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         mouse.pointsArc.length = 0
     }
 
-    function render() {
+    function render(timestamp) {
         clearCanvas()
 
-        yAxis(ctx, yMin, yMax)
-        xAxis(ctx, xData, xRatio, mouse)
+        const length = data.columns[0].length
+        const leftIndex =  Math.round((length * mouse.pos[0] / 100))
+        const rightIndex = Math.round((length * mouse.pos[1] / 100))
 
-        yData.map(toCoords(xRatio, yRatio)).forEach( (coords, i) => {
-            line(ctx, coords, data.colors[yData[i][0]], mouse)
+        const columns = data.columns.map((col,i) => {
+            const res = col.slice(leftIndex, rightIndex)
+            if (typeof res[0] !== 'string') {
+                res.unshift(col[0])
+            }
+            return res
         })
 
-        drawVerticalLine(ctx, mouse)
-        drawArc(ctx, mouse.pointsArc, yData)
+        const yData = columns.filter(col => data.types[col[0]] === 'line')
+        const xData = columns.filter(col => data.types[col[0]] !== 'line')[0]
 
-        tooltip.left( mouse.clientX + 20).update(mouse, yData)
+        const [yMin, yMax] = searchMinMax(yData.flat())
+
+        const yRatio = computeYRatio(VIEW_HEIGHT, yMax)
+        const xRatio = computeXRatio(VIEW_WIDTH, columns[0].length)
+
+        yAxis(ctx, yMax)
+        xAxis(ctx, xData, xRatio)
+
+        yData.map(toCoords(xRatio, yRatio, DPI_HEIGHT, PADDING))
+             .forEach( (coords, i) => {
+                if (mouse.pos[0] !== 0) {
+                    coords.splice(0, 1);
+                }
+
+                line(ctx, coords, data.colors[yData[i][0]])
+             })
+
+        drawVerticalLine(ctx)
+        drawArc(ctx, yData)
+
+        tooltip.left( mouse.clientX + 20).update(yData)
     }
 
     render()
@@ -63,8 +79,8 @@ function chart(canvas, data) {
 
     canvas.addEventListener('mouseenter', mouseEnter)
 
-    function mouseEnter(e) {
-        tooltip.open().left(e.clientX + 20)
+    function mouseEnter({ clientX }) {
+        tooltip.open().left(clientX)
         canvas.addEventListener('mousemove',  mouseMove)
         canvas.addEventListener('mouseleave', mouseLeave)
     }
@@ -75,7 +91,7 @@ function chart(canvas, data) {
         const currentX = Math.floor(clientX - left) * (DPI_WIDTH / WIDTH)
 
         mouse.currentX = currentX
-        mouse.clientX = clientX
+        mouse.clientX = clientX - left
     }
 
     function mouseLeave() {

@@ -35,25 +35,38 @@
     </style>
 </head>
 <body>
-    <div class="tg-chart">
-        <div class="container">
-            <div class="card">
-                <canvas id="chart"></canvas>
-            </div>
+    <div class="container">
+        <div class="card">
+            <div class="tg-chart" id="chart">
+                <div data-el="tooltip" class="tg-chart-tooltip"></div>
 
-            <div class="tg-chart-tooltip js--tooltip">
-                    <div class="tooltip-title js--tooltip-title">Sat, Feb 24</div>
-                    <div class="tooltip-list js--tooltip-list">
-                        <div class="tooltip-list-item">
-                            <div class="name">15</div>
-                            <div class="value">15</div>
-                        </div>
-                        <div class="tooltip-list-item">
-                            <div class="name">150</div>
-                            <div class="value">150</div>
-                        </div>
+                <canvas data-el="main"></canvas>
+
+                <div class="tg-chart-slider" data-el="slider">
+                    <canvas></canvas>
+                    <div data-el="left" class="tg-chart-slider__left">
+                        <div
+                                class="tg-chart-slider__arrow--left"
+                                data-el="arrow"
+                                data-type="left"
+                        ></div>
+                    </div>
+
+                    <div
+                        data-el="window"
+                        data-type="window"
+                        class="tg-chart-slider__window"
+                    ></div>
+
+                    <div data-el="right" class="tg-chart-slider__right">
+                        <div
+                            class="tg-chart-slider__arrow--right"
+                            data-el="arrow"
+                            data-type="right"
+                        ></div>
                     </div>
                 </div>
+            </div>
         </div>
     </div>
 </body>
